@@ -1,0 +1,453 @@
+@import "tailwindcss";
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root,
+html[lang="en"],
+[lang="en"] {
+  --font-active-sans: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Fraunces", Georgia, serif;
+}
+
+/* Indic fonts applied purely via the lang attribute */
+html[lang="hi"],
+html[lang="mr"],
+html[lang="bho"],
+html[lang="raj"],
+html[lang="sa"],
+[lang="hi"],
+[lang="mr"],
+[lang="bho"],
+[lang="raj"],
+[lang="sa"] {
+  --font-active-sans: "Noto Sans Devanagari", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Devanagari", "Noto Sans Devanagari", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="bn"],
+html[lang="as"],
+[lang="bn"],
+[lang="as"] {
+  --font-active-sans: "Noto Sans Bengali", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Bengali", "Noto Sans Bengali", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="pa"],
+[lang="pa"] {
+  --font-active-sans: "Noto Sans Gurmukhi", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Gurmukhi", "Noto Sans Gurmukhi", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="gu"],
+[lang="gu"] {
+  --font-active-sans: "Noto Sans Gujarati", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Gujarati", "Noto Sans Gujarati", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="kn"],
+[lang="kn"] {
+  --font-active-sans: "Noto Sans Kannada", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Kannada", "Noto Sans Kannada", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="ta"],
+[lang="ta"] {
+  --font-active-sans: "Noto Sans Tamil", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Tamil", "Noto Sans Tamil", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="te"],
+[lang="te"] {
+  --font-active-sans: "Noto Sans Telugu", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Telugu", "Noto Sans Telugu", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="ml"],
+[lang="ml"] {
+  --font-active-sans: "Noto Sans Malayalam", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Malayalam", "Noto Sans Malayalam", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+html[lang="or"],
+[lang="or"] {
+  --font-active-sans: "Noto Sans Oriya", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-active-serif: "Noto Serif Oriya", "Noto Sans Oriya", "Fraunces", Georgia, serif;
+  font-family: var(--font-active-sans);
+}
+
+:root {
+  --bg-ivory: #FAF7F2;
+  --surface-card: rgba(255, 255, 255, 0.80);
+  --surface-card-solid: #FFFFFF;
+  --color-primary: #1F4E4A;
+  --color-primary-hover: #183E3B;
+  --surface-sage: #DCE8E2;
+  --surface-sage-soft: rgba(220, 232, 226, 0.65);
+  --color-accent: #C8694A;
+  --text-ink: #1E2A28;
+  --text-muted: #5B6B67;
+  --border-hairline: #E6DFD2;
+  --status-normal: #5E9C84;
+  --status-warn: #D9A441;
+  --status-discuss: #D9776B;
+  --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Semantic aliases used by LanguageSelector and modals */
+  --bg-surface: #FAF7F2;
+  --bg-elevated: #FFFFFF;
+  --border-subtle: #E6DFD2;
+  --accent-primary: #1F4E4A;
+  --accent-soft: #DCE8E2;
+  --text-primary: #1E2A28;
+}
+
+.dark {
+  --bg-ivory: #111C1A;
+  --surface-card: rgba(22, 37, 34, 0.84);
+  --surface-card-solid: #162522;
+  --color-primary: #8CE0C0;
+  --color-primary-hover: #A3EAD0;
+  --surface-sage: #1B332E;
+  --surface-sage-soft: rgba(27, 51, 46, 0.78);
+  --color-accent: #E07E5E;
+  --text-ink: #EAE6DF;
+  --text-muted: #9EB0AC;
+  --border-hairline: #263D38;
+  --status-normal: #5E9C84;
+  --status-warn: #D9A441;
+  --status-discuss: #D9776B;
+
+  --bg-surface: #162522;
+  --bg-elevated: #1B332E;
+  --border-subtle: #263D38;
+  --accent-primary: #8CE0C0;
+  --accent-soft: #1B332E;
+  --text-primary: #EAE6DF;
+}
+
+@theme {
+  --font-serif: var(--font-active-serif, "Fraunces", Georgia, serif);
+  --font-sans: var(--font-active-sans, "DM Sans", system-ui, -apple-system, sans-serif);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html {
+    font-size: 16.5px;
+    line-height: 1.65;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+    overflow-x: clip;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      font-size: 17.5px;
+      line-height: 1.7;
+    }
+  }
+
+  body {
+    font-family: var(--font-active-sans, var(--font-sans));
+    background-color: var(--bg-ivory);
+    color: var(--text-ink);
+    line-height: 1.7;
+    transition: background-color 0.4s var(--ease-calm), color 0.4s var(--ease-calm);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+  }
+
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-active-serif, var(--font-serif));
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  /* Non-Latin Indic script typography rules:
+     - text-transform: none, letter-spacing: normal, no faux italic
+     - taller line-height (1.8 for North Indic scripts, 1.9 for South Indic scripts) */
+  html:not([lang="en"]) *,
+  html:not([lang="en"]) *::before,
+  html:not([lang="en"]) *::after {
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    font-style: normal !important;
+  }
+
+  html[data-script-group="tall-north"] body,
+  html[data-script-group="tall-north"] p,
+  html[data-script-group="tall-north"] li,
+  html[data-script-group="tall-north"] [role="log"],
+  html:is([lang="hi"], [lang="bn"], [lang="pa"], [lang="mr"], [lang="gu"], [lang="or"], [lang="as"], [lang="bho"], [lang="raj"], [lang="sa"]) body,
+  html:is([lang="hi"], [lang="bn"], [lang="pa"], [lang="mr"], [lang="gu"], [lang="or"], [lang="as"], [lang="bho"], [lang="raj"], [lang="sa"]) p,
+  html:is([lang="hi"], [lang="bn"], [lang="pa"], [lang="mr"], [lang="gu"], [lang="or"], [lang="as"], [lang="bho"], [lang="raj"], [lang="sa"]) li,
+  html:is([lang="hi"], [lang="bn"], [lang="pa"], [lang="mr"], [lang="gu"], [lang="or"], [lang="as"], [lang="bho"], [lang="raj"], [lang="sa"]) [role="log"] {
+    line-height: 1.8;
+  }
+
+  html[data-script-group="tall-south"] body,
+  html[data-script-group="tall-south"] p,
+  html[data-script-group="tall-south"] li,
+  html[data-script-group="tall-south"] [role="log"],
+  html:is([lang="kn"], [lang="ta"], [lang="te"], [lang="ml"]) body,
+  html:is([lang="kn"], [lang="ta"], [lang="te"], [lang="ml"]) p,
+  html:is([lang="kn"], [lang="ta"], [lang="te"], [lang="ml"]) li,
+  html:is([lang="kn"], [lang="ta"], [lang="te"], [lang="ml"]) [role="log"] {
+    line-height: 1.9;
+  }
+
+  /* Terracotta visible focus ring for keyboard accessibility */
+  *:focus-visible {
+    outline: 2px solid var(--color-accent) !important;
+    outline-offset: 3px !important;
+  }
+}
+
+/* Explicit screen-reader-only utility guarantee */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border-width: 0 !important;
+}
+
+/* Subtle SVG noise paper grain texture (~4% opacity) over warm ivory */
+.paper-grain {
+  position: relative;
+  background-color: var(--bg-ivory);
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoise)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* Surface cards: #FFFFFF with 80% opacity over paper texture + thin 1px hairline border + teal-tinted soft layered shadow */
+.clinic-card {
+  background-color: var(--surface-card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-hairline);
+  border-radius: 24px;
+  box-shadow:
+    0 24px 48px -18px rgba(31, 78, 74, 0.075),
+    0 6px 16px -6px rgba(31, 78, 74, 0.04),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.65);
+  transition:
+    transform 0.45s var(--ease-calm),
+    box-shadow 0.45s var(--ease-calm),
+    border-color 0.45s var(--ease-calm);
+}
+
+.dark .clinic-card {
+  box-shadow:
+    0 24px 48px -18px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.clinic-card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 30px 60px -18px rgba(31, 78, 74, 0.12),
+    0 10px 24px -8px rgba(31, 78, 74, 0.06),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+}
+
+.dark .clinic-card-hover:hover {
+  box-shadow:
+    0 30px 60px -18px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+}
+
+/* Soft sage surface card (#DCE8E2) */
+.clinic-sage-card {
+  background-color: var(--surface-sage);
+  border: 1px solid rgba(31, 78, 74, 0.12);
+  border-radius: 24px;
+  box-shadow:
+    0 20px 44px -18px rgba(31, 78, 74, 0.08),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+}
+
+.dark .clinic-sage-card {
+  border-color: rgba(140, 224, 192, 0.16);
+  box-shadow:
+    0 20px 44px -18px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Handwritten checklist lined paper card for Doctor Questions */
+.paper-checklist-card {
+  background-color: rgba(255, 255, 255, 0.86);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 35px,
+    rgba(31, 78, 74, 0.055) 35px,
+    rgba(31, 78, 74, 0.055) 36px
+  );
+  border: 1px solid var(--border-hairline);
+  border-radius: 24px;
+  box-shadow:
+    0 24px 48px -18px rgba(31, 78, 74, 0.08),
+    0 6px 16px -6px rgba(31, 78, 74, 0.04);
+}
+
+.dark .paper-checklist-card {
+  background-color: rgba(22, 37, 34, 0.88);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 35px,
+    rgba(140, 224, 192, 0.05) 35px,
+    rgba(140, 224, 192, 0.05) 36px
+  );
+}
+
+/* Primary button with subtle sheen sweep and gentle hover lift */
+.btn-primary-teal {
+  position: relative;
+  overflow: hidden;
+  background-color: #1F4E4A;
+  color: #FAF7F2;
+  box-shadow: 0 10px 24px -8px rgba(31, 78, 74, 0.32);
+  transition:
+    transform 0.4s var(--ease-calm),
+    box-shadow 0.4s var(--ease-calm),
+    background-color 0.4s var(--ease-calm);
+}
+
+.btn-primary-teal::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 65%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%
+  );
+  transition: left 0.65s var(--ease-calm);
+  pointer-events: none;
+}
+
+.btn-primary-teal:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background-color: #183E3B;
+  box-shadow: 0 16px 32px -8px rgba(31, 78, 74, 0.42);
+}
+
+.btn-primary-teal:hover:not(:disabled)::after {
+  left: 140%;
+}
+
+@keyframes sparkles-hover-pulse {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 0px rgba(250, 247, 242, 0));
+  }
+  28% {
+    transform: scale(1.15) rotate(14deg);
+    filter: drop-shadow(0 0 6px rgba(250, 247, 242, 0.55));
+  }
+  55% {
+    transform: scale(1.04) rotate(-8deg);
+    filter: drop-shadow(0 0 3px rgba(250, 247, 242, 0.3));
+  }
+  78% {
+    transform: scale(1.2) rotate(18deg);
+    filter: drop-shadow(0 0 8px rgba(250, 247, 242, 0.7));
+  }
+}
+
+.btn-primary-teal:hover:not(:disabled) .sparkles-icon {
+  animation: sparkles-hover-pulse 1.35s var(--ease-calm) infinite;
+}
+
+.btn-primary-teal:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Interactive secondary button lift & press */
+.btn-calm-lift {
+  transition:
+    transform 0.4s var(--ease-calm),
+    box-shadow 0.4s var(--ease-calm),
+    background-color 0.4s var(--ease-calm);
+}
+
+.btn-calm-lift:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -10px rgba(31, 78, 74, 0.16);
+}
+
+.btn-calm-lift:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Soft inner shadow for comfortable textarea */
+.textarea-inner-calm {
+  box-shadow: inset 0 2px 7px rgba(31, 78, 74, 0.055);
+}
+
+.dark .textarea-inner-calm {
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.35);
+}
+
+/* Hide scrollbars on horizontal touch strips while keeping scrollability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile safe-area bottom padding */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #1E2A28 !important;
+    font-size: 12pt !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only-border {
+    background: #FFFFFF !important;
+    border: 1px solid #C9C2B4 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}

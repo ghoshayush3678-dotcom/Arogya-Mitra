@@ -1,0 +1,6 @@
+{
+  "name": "Plainly",
+  "description": "A calm, clear medical report and prescription explainer that translates confusing health documents into plain, kind language.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
