@@ -3,9 +3,11 @@ services:
     name: arogya-mitra
     env: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
       - key: GEMINI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGIN
         sync: false

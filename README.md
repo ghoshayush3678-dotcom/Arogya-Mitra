@@ -55,19 +55,37 @@ Arogya Mitra translates confusing medical lab reports and prescriptions into cal
 
 ---
 
-## Deploy to Render (Node Web Service)
+## Deployment (Two-Part Setup: Render Backend + GitHub Pages Frontend)
 
-1. Connect your GitHub repository to [Render](https://render.com/).
-2. Create a new **Web Service** with the following settings:
+### Part 1: Deploy Backend to Render (Node Web Service)
+
+1. Connect your repository to [Render](https://render.com/).
+2. Create a new **Web Service** (or use the included `render.yaml` Blueprint) with the following settings:
    - **Environment**: Node
    - **Node Version**: `>=20.0.0`
-   - **Build Command**: `npm ci && npm run build`
+   - **Build Command**: `npm install && npm run build`
    - **Start Command**: `npm start`
    - **Health Check Path**: `/healthz`
-3. Add the required Environment Variable in the Render dashboard:
-   - `GEMINI_API_KEY`: Your Google Gemini API key
+3. Add the following **Environment Variables** in the Render service dashboard:
+   - `GEMINI_API_KEY`: Your Google Gemini API key (kept strictly secure on the server; never exposed to the frontend)
+   - `ALLOWED_ORIGIN`: Your GitHub Pages origin URL (e.g. `https://<your-username>.github.io`) to allow secure cross-origin API calls
+4. Once deployed, note your Render web service URL (e.g., `https://arogya-mitra.onrender.com`).
 
-Alternatively, use the included `render.yaml` Blueprint for 1-click deployment.
+---
+
+### Part 2: Deploy Frontend to GitHub Pages
+
+1. In your GitHub repository, navigate to **Settings** → **Secrets and variables** → **Actions** → **Variables** tab.
+2. Click **New repository variable** and add:
+   - **Name**: `VITE_API_URL`
+   - **Value**: Your Render service URL (e.g., `https://arogya-mitra.onrender.com`)
+3. Go to **Settings** → **Pages** → **Build and deployment**:
+   - Under **Source**, select **GitHub Actions**.
+4. Push your changes to the `main` branch (or run the workflow manually via **Actions** → **Deploy Frontend to GitHub Pages** → **Run workflow**).
+5. The GitHub Actions workflow (`.github/workflows/pages.yml`) will automatically:
+   - Build the frontend bundle with `VITE_BASE=/<repository-name>/` and `VITE_API_URL` pointing to your Render backend.
+   - Generate `dist/404.html` and `dist/.nojekyll` for clean client routing.
+   - Deploy directly to GitHub Pages.
 
 ---
 

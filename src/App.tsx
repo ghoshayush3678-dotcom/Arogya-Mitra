@@ -60,6 +60,8 @@ import {
 } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
 
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+
 export type ItemStatus = "normal" | "slightly_high" | "slightly_low" | "discuss_soon";
 export type ItemType = "lab" | "medicine";
 
@@ -1257,7 +1259,7 @@ export default function App() {
       const currentMeta =
         LANGUAGE_META_MAP[languageCode] || LANGUAGE_META_MAP.en;
 
-      const response = await fetch("/api/chat", {
+      const response = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1483,7 +1485,7 @@ export default function App() {
       const currentMeta =
         LANGUAGE_META_MAP[languageCode] || LANGUAGE_META_MAP.en;
 
-      const response = await fetch("/api/analyze", {
+      const response = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1801,7 +1803,7 @@ export default function App() {
           const currentMeta =
             LANGUAGE_META_MAP[languageCode] || LANGUAGE_META_MAP.en;
 
-          const res = await fetch("/api/transcribe", {
+          const res = await fetch(`${API_BASE}/api/transcribe`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

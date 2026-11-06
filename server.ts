@@ -329,6 +329,52 @@ async function startServer() {
     res.status(200).send("OK");
   });
 
+  // CORS configuration for GitHub Pages and local development
+  const rawAllowedOrigin = process.env.ALLOWED_ORIGIN || "";
+  const configuredOrigins = rawAllowedOrigin
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+
+  const allowedOrigins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    ...configuredOrigins,
+  ];
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      const normalizedOrigin = origin.replace(/\/+$/, "");
+      const isAllowed =
+        rawAllowedOrigin === "*" ||
+        allowedOrigins.includes(normalizedOrigin) ||
+        (origin.endsWith(".github.io") &&
+          (!rawAllowedOrigin || rawAllowedOrigin.includes(".github.io"))) ||
+        (!rawAllowedOrigin && process.env.NODE_ENV !== "production");
+
+      if (isAllowed) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+      }
+    }
+
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, Accept"
+    );
+    res.setHeader("Access-Control-Max-Age", "86400");
+
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(204);
+    }
+    next();
+  });
+
   // Support up to 15MB JSON bodies for base64 PDF/image uploads
   app.use(express.json({ limit: "15mb" }));
 
