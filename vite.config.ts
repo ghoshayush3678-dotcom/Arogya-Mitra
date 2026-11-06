@@ -1,23 +1,23 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { fileURLToPath } from 'url';
+import { defineConfig } from 'vite';
 
-export default defineConfig(({ command }) => {
-  const isBuild = command === 'build';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export default defineConfig(() => {
   return {
+    base: '/',
     plugins: [react(), tailwindcss()],
-    define: isBuild
-      ? {
-          'process.env.NODE_ENV': JSON.stringify('production'),
-        }
-      : undefined,
     resolve: {
       alias: {
-        '@': path.resolve(import.meta.dirname, '.'),
+        '@': path.resolve(__dirname, '.'),
       },
     },
     build: {
+      outDir: 'dist',
       rolldownOptions: {
         output: {
           manualChunks(id) {
@@ -39,11 +39,6 @@ export default defineConfig(({ command }) => {
           },
         },
       },
-    },
-    server: {
-      hmr: false,
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };
 });

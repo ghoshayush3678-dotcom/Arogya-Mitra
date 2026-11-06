@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import {
   FIXED_SAFETY_MESSAGES,
@@ -15,9 +14,21 @@ import type { LanguageMeta } from "./src/i18n/types";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception handled:", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection handled:", reason);
+});
+
 function getAiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || !apiKey.trim()) {
+    return null;
+  }
   return new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey: apiKey.trim(),
     httpOptions: {
       headers: {
         "User-Agent": "aistudio-build",
@@ -311,17 +322,24 @@ export class ErrorOverlay extends (typeof HTMLElement !== "undefined" ? HTMLElem
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
+
+  // Immediate health check route for Cloud Run and Render
+  app.get("/healthz", (_req, res) => {
+    res.status(200).send("OK");
+  });
 
   // Support up to 15MB JSON bodies for base64 PDF/image uploads
   app.use(express.json({ limit: "15mb" }));
 
-  // Intercept /@vite/client so the browser never attempts to open a Vite HMR WebSocket
-  app.get("/@vite/client", (_req, res) => {
-    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
-    res.setHeader("Cache-Control", "no-store");
-    res.send(NO_WS_VITE_CLIENT);
-  });
+  // Intercept /@vite/client so the browser never attempts to open a Vite HMR WebSocket in development
+  if (process.env.NODE_ENV !== "production") {
+    app.get("/@vite/client", (_req, res) => {
+      res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.send(NO_WS_VITE_CLIENT);
+    });
+  }
 
   app.post("/api/analyze", async (req, res) => {
     try {
@@ -488,6 +506,12 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
       }
 
       const ai = getAiClient();
+      if (!ai) {
+        return res.status(503).json({
+          error:
+            "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to analyze reports.",
+        });
+      }
       const response = await ai.models.generateContent({
         model: "gemini-3.1-flash-lite",
         contents: { parts },
@@ -600,6 +624,12 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
       const langMeta = resolveLanguageMeta(languageCode || language);
 
       const ai = getAiClient();
+      if (!ai) {
+        return res.status(503).json({
+          error:
+            "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to transcribe audio.",
+        });
+      }
       const response = await ai.models.generateContent({
         model: "gemini-3.1-flash-lite",
         contents: {
@@ -827,6 +857,12 @@ Referral and urgency rules (set the 'urgency' field):
         .join("\n\n");
 
       const ai = getAiClient();
+      if (!ai) {
+        return res.status(503).json({
+          error:
+            "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to chat with a specialist.",
+        });
+      }
 
       // Run main chat call and parallel emergency classifier across all 15 languages
       const mainChatPromise = ai.models.generateContent({
@@ -1033,28 +1069,39 @@ Return JSON { "namesMedicine": true } if the assistant named/suggested/dosed any
   });
 
   if (process.env.NODE_ENV !== "production") {
-    const vitePromise = createViteServer({
-      server: { middlewareMode: true, hmr: false, ws: false as const },
-      appType: "spa",
-    });
+    let viteMiddleware: express.RequestHandler | null = null;
+    import("vite")
+      .then(({ createServer: createViteServer }) =>
+        createViteServer({
+          server: { middlewareMode: true, hmr: false, ws: false as const },
+          appType: "spa",
+        })
+      )
+      .then((vite) => {
+        viteMiddleware = vite.middlewares;
+      })
+      .catch((err) => {
+        console.error("Failed to initialize Vite development server:", err);
+      });
 
-    app.use(async (req, res, next) => {
-      try {
-        const vite = await vitePromise;
-        vite.middlewares(req, res, next);
-      } catch (err) {
-        next(err);
+    app.use((req, res, next) => {
+      if (viteMiddleware) {
+        viteMiddleware(req, res, next);
+      } else {
+        next();
       }
     });
   } else {
-    const distPath = path.join(__dirname, "dist");
+    const distPath = path.resolve(__dirname, "dist");
     app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api/")) return next();
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Listening on 0.0.0.0:${PORT}`);
     console.log(`Arogya Mitra server running on http://localhost:${PORT}`);
     console.log(`  ➜  Local:   http://localhost:${PORT}/`);
     console.log(`  ➜  Network: http://0.0.0.0:${PORT}/`);
