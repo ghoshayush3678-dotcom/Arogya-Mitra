@@ -1,18 +1,24 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, Type } from "@google/genai";
-import {
-  FIXED_SAFETY_MESSAGES,
-  LANGUAGE_META_MAP,
-  SUPPORTED_LANGUAGES,
-  type LanguageCode,
-} from "./src/i18n/safetyMessages";
+import type { LanguageCode } from "./src/i18n/safetyMessages";
 import type { LanguageMeta } from "./src/i18n/types";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+type SafetyMessagesModule = typeof import("./src/i18n/safetyMessages");
+let safetyMessagesPromise: Promise<SafetyMessagesModule> | null = null;
+
+function getSafetyMessages(): Promise<SafetyMessagesModule> {
+  if (!safetyMessagesPromise) {
+    safetyMessagesPromise = import("./src/i18n/safetyMessages");
+  }
+  return safetyMessagesPromise;
+}
 
 process.on("uncaughtException", (error) => {
   console.error("Uncaught exception handled:", error);
@@ -182,7 +188,11 @@ async function generateContentWithRetryAndFallback(
   }
 }
 
-function resolveLanguageMeta(input?: string): LanguageMeta {
+function resolveLanguageMeta(
+  safety: SafetyMessagesModule,
+  input?: string
+): LanguageMeta {
+  const { LANGUAGE_META_MAP, SUPPORTED_LANGUAGES } = safety;
   if (!input || typeof input !== "string") {
     return LANGUAGE_META_MAP.en;
   }
@@ -492,16 +502,55 @@ function resolveServerPort(): number {
   return 3000;
 }
 
-async function startServer() {
+function startServer() {
   const app = express();
-  const PORT = resolveServerPort();
+  const PORT =
+    process.env.NODE_ENV === "production"
+      ? Number(process.env.PORT) || 3000
+      : resolveServerPort();
 
-  // Immediate health check route for Cloud Run and Render
+  // Register GET /healthz BEFORE any other route or middleware
   app.get("/healthz", (_req, res) => {
-    res.status(200).send("OK");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.status(200).send("ok");
   });
 
-  // CORS configuration for GitHub Pages and local development
+  let devVitePromise: Promise<any> | null = null;
+  let devViteMiddleware: express.RequestHandler | null = null;
+
+  // Bind and listen immediately so Render / Cloud Run health checks never reset or time out
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Listening on 0.0.0.0:${PORT}`);
+
+    // Heavy setup (translations pre-warm & dev-only Vite server) runs AFTER listening
+    void getSafetyMessages().catch((err) => {
+      console.error("[startup] safetyMessages pre-warm failed:", extractErrorMeta(err));
+    });
+
+    if (process.env.NODE_ENV !== "production") {
+      devVitePromise = import("vite")
+        .then(({ createServer: createViteServer }) =>
+          createViteServer({
+            server: { middlewareMode: true, hmr: false, ws: false as const },
+            appType: "spa",
+          })
+        )
+        .then((vite) => {
+          devViteMiddleware = vite.middlewares;
+          return vite;
+        })
+        .catch((err) => {
+          console.error("Failed to initialize Vite development server:", err);
+          return null;
+        });
+    }
+  });
+
+  server.on("error", (err) => {
+    console.error("[server] HTTP server error:", extractErrorMeta(err));
+  });
+
+  // CORS configuration applied before all remaining routes
   const rawAllowedOrigin = process.env.ALLOWED_ORIGIN || "";
   const configuredOrigins = rawAllowedOrigin
     .split(",")
@@ -516,50 +565,35 @@ async function startServer() {
     })
     .filter(Boolean);
 
-  const allowedOrigins = [
+  const allowedOrigins = new Set([
     "https://ghoshayush3678-dotcom.github.io",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     ...configuredOrigins,
-  ];
+  ]);
 
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin) {
+  const corsMiddleware = cors({
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
       const normalizedOrigin = origin.replace(/\/+$/, "");
       const isAllowed =
         rawAllowedOrigin === "*" ||
-        allowedOrigins.includes(normalizedOrigin) ||
-        (origin.endsWith(".github.io") &&
+        allowedOrigins.has(normalizedOrigin) ||
+        (normalizedOrigin.endsWith(".github.io") &&
           (!rawAllowedOrigin || rawAllowedOrigin.includes(".github.io"))) ||
         (!rawAllowedOrigin && process.env.NODE_ENV !== "production");
-
-      if (isAllowed) {
-        res.setHeader("Access-Control-Allow-Origin", origin);
-        res.setHeader("Vary", "Origin");
-      }
-    }
-
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Requested-With, Accept"
-    );
-    res.setHeader("Access-Control-Max-Age", "86400");
-
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(204);
-    }
-    next();
+      return callback(null, isAllowed);
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    maxAge: 86400,
+    optionsSuccessStatus: 204,
   });
 
-  // Explicitly handle OPTIONS preflight across every /api route
-  app.options("/api/*", (_req, res) => {
-    return res.sendStatus(204);
-  });
+  app.use(corsMiddleware);
+  app.options("/api/*", corsMiddleware);
 
   // Allow 15MB for base64 PDF/image/audio routes and 1MB JSON limit for chat & default routes
   app.use("/api/analyze", express.json({ limit: "15mb" }));
@@ -647,7 +681,8 @@ async function startServer() {
         profilePromptContext?: string;
       };
 
-      const langMeta = resolveLanguageMeta(languageCode || language);
+      const safety = await getSafetyMessages();
+      const langMeta = resolveLanguageMeta(safety, languageCode || language);
       const langDisplay = `${langMeta.nativeName} (${langMeta.englishName}, code: ${langMeta.code})`;
 
       if (mode === "upload") {
@@ -890,7 +925,8 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
         });
       }
 
-      const langMeta = resolveLanguageMeta(languageCode || language);
+      const safety = await getSafetyMessages();
+      const langMeta = resolveLanguageMeta(safety, languageCode || language);
 
       const ai = getAiClient();
       if (!ai) {
@@ -1040,10 +1076,12 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
         messages?: Array<{ role: "user" | "assistant"; content: string }>;
       };
 
-      const langMeta = resolveLanguageMeta(languageCode || language);
+      const safety = await getSafetyMessages();
+      const langMeta = resolveLanguageMeta(safety, languageCode || language);
       const langDisplay = `${langMeta.nativeName} (${langMeta.englishName}, code: ${langMeta.code})`;
       const fixedSafety =
-        FIXED_SAFETY_MESSAGES[langMeta.code] || FIXED_SAFETY_MESSAGES.en;
+        safety.FIXED_SAFETY_MESSAGES[langMeta.code] ||
+        safety.FIXED_SAFETY_MESSAGES.en;
 
       if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
         const msg =
@@ -1406,49 +1444,31 @@ Return JSON { "namesMedicine": true } if the assistant named/suggested/dosed any
     }
   );
 
-  if (process.env.NODE_ENV !== "production") {
-    let viteMiddleware: express.RequestHandler | null = null;
-    const vitePromise = import("vite")
-      .then(({ createServer: createViteServer }) =>
-        createViteServer({
-          server: { middlewareMode: true, hmr: false, ws: false as const },
-          appType: "spa",
-        })
-      )
-      .then((vite) => {
-        viteMiddleware = vite.middlewares;
-        return vite;
-      })
-      .catch((err) => {
-        console.error("Failed to initialize Vite development server:", err);
-        return null;
-      });
-
-    app.use(async (req, res, next) => {
-      if (viteMiddleware) {
-        return viteMiddleware(req, res, next);
-      }
-      const vite = await vitePromise;
-      if (vite) {
-        return vite.middlewares(req, res, next);
-      }
-      next();
-    });
-  } else {
+  if (process.env.NODE_ENV === "production") {
     const distPath = path.resolve(__dirname, "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api/")) return next();
-      res.sendFile(path.join(distPath, "index.html"));
+      if (req.path === "/api" || req.path.startsWith("/api/")) return next();
+      res.sendFile(path.join(distPath, "index.html"), (err) => {
+        if (err && !res.headersSent) {
+          res.status(404).send("Build not found");
+        }
+      });
+    });
+  } else {
+    app.use(async (req, res, next) => {
+      if (devViteMiddleware) {
+        return devViteMiddleware(req, res, next);
+      }
+      if (devVitePromise) {
+        const vite = await devVitePromise;
+        if (vite) {
+          return vite.middlewares(req, res, next);
+        }
+      }
+      next();
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Listening on 0.0.0.0:${PORT}`);
-    console.log(`Arogya Mitra server running on http://localhost:${PORT}`);
-    console.log(`  ➜  Local:   http://localhost:${PORT}/`);
-    console.log(`  ➜  Network: http://0.0.0.0:${PORT}/`);
-  });
 }
 
 startServer();
