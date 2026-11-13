@@ -320,9 +320,36 @@ export class ErrorOverlay extends (typeof HTMLElement !== "undefined" ? HTMLElem
 }
 `;
 
+function resolveServerPort(): number {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--port" && args[i + 1]) {
+      const parsed = Number(args[i + 1]);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    } else if (args[i].startsWith("--port=")) {
+      const parsed = Number(args[i].slice("--port=".length));
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  }
+
+  const envPort = process.env.PORT;
+  const nginxPort = process.env.NGINX_PORT;
+  if (envPort && (!nginxPort || envPort !== nginxPort)) {
+    const parsed = Number(envPort);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  if (process.env.DEFAULT_APP_PORT) {
+    const parsed = Number(process.env.DEFAULT_APP_PORT);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return 3000;
+}
+
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = resolveServerPort();
 
   // Immediate health check route for Cloud Run and Render
   app.get("/healthz", (_req, res) => {
@@ -1116,7 +1143,7 @@ Return JSON { "namesMedicine": true } if the assistant named/suggested/dosed any
 
   if (process.env.NODE_ENV !== "production") {
     let viteMiddleware: express.RequestHandler | null = null;
-    import("vite")
+    const vitePromise = import("vite")
       .then(({ createServer: createViteServer }) =>
         createViteServer({
           server: { middlewareMode: true, hmr: false, ws: false as const },
@@ -1125,17 +1152,22 @@ Return JSON { "namesMedicine": true } if the assistant named/suggested/dosed any
       )
       .then((vite) => {
         viteMiddleware = vite.middlewares;
+        return vite;
       })
       .catch((err) => {
         console.error("Failed to initialize Vite development server:", err);
+        return null;
       });
 
-    app.use((req, res, next) => {
+    app.use(async (req, res, next) => {
       if (viteMiddleware) {
-        viteMiddleware(req, res, next);
-      } else {
-        next();
+        return viteMiddleware(req, res, next);
       }
+      const vite = await vitePromise;
+      if (vite) {
+        return vite.middlewares(req, res, next);
+      }
+      next();
     });
   } else {
     const distPath = path.resolve(__dirname, "dist");
