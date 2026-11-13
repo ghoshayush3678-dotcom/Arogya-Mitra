@@ -372,6 +372,7 @@ async function startServer() {
     .filter(Boolean);
 
   const allowedOrigins = [
+    "https://ghoshayush3678-dotcom.github.io",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     ...configuredOrigins,
