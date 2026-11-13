@@ -292,6 +292,7 @@ const bn: TranslationDictionary = {
     suggestedSpecialistPrefix: "পরামর্শকৃত বিশেষজ্ঞ:",
     findDoctorNearMeBtn: "কাছাকাছি ডাক্তার খুঁজুন",
     thinkingStatus: "{specialty} গাইড ভাবছেন…",
+    wakingUpStatus: "আমাদের সার্ভার চালু হচ্ছে, এতে এক মিনিট পর্যন্ত সময় লাগতে পারে…",
     retryBtn: "আবার চেষ্টা করুন",
     inputPlaceholder:
       "আপনার বিশেষজ্ঞ গাইডকে বলুন আপনার কী অনুভূত হচ্ছে… (পাঠাতে Enter, নতুন লাইনের জন্য Shift+Enter)",

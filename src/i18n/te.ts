@@ -292,6 +292,7 @@ const te: TranslationDictionary = {
     suggestedSpecialistPrefix: "సూచించిన నిపుణుడు:",
     findDoctorNearMeBtn: "నా దగ్గరలో డాక్టర్‌ను వెతకండి",
     thinkingStatus: "{specialty} గైడ్ ఆలోచిస్తున్నారు…",
+    wakingUpStatus: "మా సర్వర్ మేల్కొంటోంది, దీనికి ఒక నిమిషం వరకు పట్టవచ్చు…",
     retryBtn: "మళ్ళీ ప్రయత్నించండి",
     inputPlaceholder:
       "మీకు ఎలా అనిపిస్తుందో మీ నిపుణుల గైడ్‌కు చెప్పండి… (పంపడానికి Enter, కొత్త లైన్ కోసం Shift+Enter)",

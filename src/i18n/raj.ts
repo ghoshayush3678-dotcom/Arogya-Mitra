@@ -298,6 +298,7 @@ const raj: TranslationDictionary = {
     suggestedSpecialistPrefix: "सुझायोड़ा विशेषज्ञ:",
     findDoctorNearMeBtn: "आस-पास डॉक्टर खोजो",
     thinkingStatus: "{specialty} गाइड सोच रैया है…",
+    wakingUpStatus: "म्हारो सर्वर जाग रियो है, ईं में एक मिनट तक लाग सके है…",
     retryBtn: "पाछी कोसिस करो",
     inputPlaceholder:
       "थानै कांई तकलीफ है, आपणा विशेषज्ञ गाइड नै बताओ… (भेजण सारू Enter, नई लाइन सारू Shift+Enter)",

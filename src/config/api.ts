@@ -13,3 +13,16 @@ export const API_BASE = (
 )
   .trim()
   .replace(/\/+$/, "");
+
+export async function fetchBackendDiagnose(): Promise<{
+  keyPresent: boolean;
+  geminiOk: boolean;
+  errorType: string | null;
+}> {
+  const response = await fetch(`${API_BASE}/api/diagnose`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return response.json();
+}
+

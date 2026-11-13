@@ -299,6 +299,7 @@ const asDict: TranslationDictionary = {
     suggestedSpecialistPrefix: "পৰামৰ্শিত বিশেষজ্ঞ:",
     findDoctorNearMeBtn: "মোৰ ওচৰত চিকিৎসক বিচাৰক",
     thinkingStatus: "{specialty} গাইডে ভাবি আছে…",
+    wakingUpStatus: "আমাৰ ছাৰ্ভাৰ আৰম্ভ হৈ আছে, ইয়াত এক মিনিটলৈকে সময় লাগিব পাৰে…",
     retryBtn: "পুনৰ চেষ্টা কৰক",
     inputPlaceholder:
       "আপুনি কি অনুভৱ কৰিছে বিশেষজ্ঞ গাইডক কওক… (পঠিয়াবলৈ Enter, নতুন শাৰীৰ বাবে Shift+Enter)",

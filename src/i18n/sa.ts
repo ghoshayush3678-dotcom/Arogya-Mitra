@@ -299,6 +299,7 @@ const sa: TranslationDictionary = {
     suggestedSpecialistPrefix: "परामर्शितः विशेषज्ञः:",
     findDoctorNearMeBtn: "मम समीपे वैद्यम् अन्विष्यताम्",
     thinkingStatus: "{specialty} मार्गदर्शकः चिन्तयति…",
+    wakingUpStatus: "अस्माकं सेवकः जागर्ति, अस्मिन् एकः निमेषः यावत् समयः लगितुम् अर्हति…",
     retryBtn: "पुनः प्रयतताम्",
     inputPlaceholder:
       "भवान् किम् अनुभवति इति विशेषज्ञ-मार्गदर्शकं वदतु… (प्रेषयितुम् Enter)",

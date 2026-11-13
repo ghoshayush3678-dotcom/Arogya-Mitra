@@ -292,6 +292,7 @@ const ta: TranslationDictionary = {
     suggestedSpecialistPrefix: "பரிந்துரைக்கப்படும் நிபுணர்:",
     findDoctorNearMeBtn: "என் அருகில் மருத்துவரைத் தேடு",
     thinkingStatus: "{specialty} வழிகாட்டி சிந்திக்கிறார்…",
+    wakingUpStatus: "எங்கள் சர்வர் விழித்துக் கொண்டிருக்கிறது, இதற்கு ஒரு நிமிடம் வரை ஆகலாம்…",
     retryBtn: "மீண்டும் முயற்சி செய்",
     inputPlaceholder:
       "உங்களுக்கு என்ன தோன்றுகிறது என்பதை உங்கள் நிபுணர் வழிகாட்டியிடம் கூறுங்கள்… (அனுப்ப Enter, புதிய வரிக்கு Shift+Enter)",

@@ -299,6 +299,7 @@ const en: TranslationDictionary = {
     suggestedSpecialistPrefix: "Suggested Specialist:",
     findDoctorNearMeBtn: "Find a doctor near me",
     thinkingStatus: "{specialty} Guide is thinking…",
+    wakingUpStatus: "Our server is waking up, this can take up to a minute…",
     retryBtn: "Retry",
     inputPlaceholder:
       "Tell your specialist guide what you're feeling… (Enter to send, Shift+Enter for new line)",

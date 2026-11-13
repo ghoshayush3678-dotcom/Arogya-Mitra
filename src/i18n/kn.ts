@@ -292,6 +292,7 @@ const kn: TranslationDictionary = {
     suggestedSpecialistPrefix: "ಸೂಚಿಸಿದ ತಜ್ಞರು:",
     findDoctorNearMeBtn: "ನನ್ನ ಹತ್ತಿರ ವೈದ್ಯರನ್ನು ಹುಡುಕಿ",
     thinkingStatus: "{specialty} ಮಾರ್ಗದರ್ಶಿ ಯೋಚಿಸುತ್ತಿದ್ದಾರೆ…",
+    wakingUpStatus: "ನಮ್ಮ ಸರ್ವರ್ ಎಚ್ಚರಗೊಳ್ಳುತ್ತಿದೆ, ಇದಕ್ಕೆ ಒಂದು ನಿಮಿಷದವರೆಗೆ ಸಮಯ ತೆಗೆದುಕೊಳ್ಳಬಹುದು…",
     retryBtn: "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
     inputPlaceholder:
       "ನಿಮಗೆ ಏನು ಅನಿಸುತ್ತಿದೆ ಎಂದು ನಿಮ್ಮ ತಜ್ಞ ಮಾರ್ಗದರ್ಶಿಗೆ ತಿಳಿಸಿ… (ಕಳುಹಿಸಲು Enter, ಹೊಸ ಸಾಲಿಗೆ Shift+Enter)",

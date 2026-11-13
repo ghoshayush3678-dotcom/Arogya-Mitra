@@ -292,6 +292,7 @@ const ml: TranslationDictionary = {
     suggestedSpecialistPrefix: "നിർദ്ദേശിച്ച വിദഗ്ദ്ധൻ:",
     findDoctorNearMeBtn: "എന്റെ അടുത്തുള്ള ഡോക്ടറെ കണ്ടെത്തുക",
     thinkingStatus: "{specialty} ഗൈഡ് ചിന്തിക്കുന്നു…",
+    wakingUpStatus: "ഞങ്ങളുടെ സെർവർ ഉണരുകയാണ്, ഇതിന് ഒരു മിനിറ്റ് വരെ എടുത്തേക്കാം…",
     retryBtn: "വീണ്ടും ശ്രമിക്കുക",
     inputPlaceholder:
       "നിങ്ങൾക്ക് എന്ത് തോന്നുന്നുവെന്ന് വിദഗ്ദ്ധ ഗൈഡിനോട് പറയുക… (അയയ്ക്കാൻ Enter, പുതിയ വരിക്ക് Shift+Enter)",

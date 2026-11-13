@@ -292,6 +292,7 @@ const gu: TranslationDictionary = {
     suggestedSpecialistPrefix: "સૂચવેલા નિષ્ણાત:",
     findDoctorNearMeBtn: "મારી નજીક ડૉક્ટર શોધો",
     thinkingStatus: "{specialty} માર્ગદર્શક વિચારી રહ્યા છે…",
+    wakingUpStatus: "અમારું સર્વર શરૂ થઈ રહ્યું છે, આમાં એક મિનિટ સુધીનો સમય લાગી શકે છે…",
     retryBtn: "ફરી પ્રયાસ કરો",
     inputPlaceholder:
       "તમારા નિષ્ણાત માર્ગદર્શકને જણાવો કે તમને શું અનુભવાઈ રહ્યું છે… (મોકલવા Enter, નવી લાઇન માટે Shift+Enter)",

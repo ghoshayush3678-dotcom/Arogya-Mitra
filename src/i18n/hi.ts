@@ -292,6 +292,7 @@ const hi: TranslationDictionary = {
     suggestedSpecialistPrefix: "सुझाए गए विशेषज्ञ:",
     findDoctorNearMeBtn: "मेरे पास डॉक्टर खोजें",
     thinkingStatus: "{specialty} गाइड सोच रहे हैं…",
+    wakingUpStatus: "हमारा सर्वर जाग रहा है, इसमें एक मिनट तक लग सकता है…",
     retryBtn: "पुनः प्रयास करें",
     inputPlaceholder:
       "अपने विशेषज्ञ गाइड को बताएं कि आपको क्या महसूस हो रहा है… (भेजने के लिए Enter, नई लाइन के लिए Shift+Enter)",

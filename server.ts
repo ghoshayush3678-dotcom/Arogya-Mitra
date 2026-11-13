@@ -37,6 +37,151 @@ function getAiClient() {
   });
 }
 
+const PRIMARY_GEMINI_MODEL = "gemini-3.1-flash-lite";
+const FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
+
+function extractErrorMeta(error: any): {
+  name: string;
+  status: number;
+  message: string;
+} {
+  const rawMessage = String(error?.message || "Unknown error");
+  let status = Number(error?.status || error?.statusCode || error?.code);
+  if (!Number.isFinite(status) || status < 100 || status > 599) {
+    if (rawMessage.includes("404") || rawMessage.includes("NOT_FOUND")) {
+      status = 404;
+    } else if (
+      rawMessage.includes("429") ||
+      rawMessage.includes("RESOURCE_EXHAUSTED")
+    ) {
+      status = 429;
+    } else if (
+      rawMessage.includes("503") ||
+      rawMessage.includes("UNAVAILABLE")
+    ) {
+      status = 503;
+    } else if (
+      rawMessage.includes("403") ||
+      rawMessage.includes("PERMISSION_DENIED") ||
+      rawMessage.includes("API_KEY_INVALID")
+    ) {
+      status = 403;
+    } else if (
+      rawMessage.includes("401") ||
+      rawMessage.includes("UNAUTHENTICATED")
+    ) {
+      status = 401;
+    } else if (
+      rawMessage.includes("400") ||
+      rawMessage.includes("INVALID_ARGUMENT")
+    ) {
+      status = 400;
+    } else {
+      status = 500;
+    }
+  }
+  return {
+    name: String(error?.name || "Error"),
+    status,
+    message: rawMessage.slice(0, 300),
+  };
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const err: any = new Error(`${label} timed out after ${ms}ms`);
+      err.name = "TimeoutError";
+      err.status = 504;
+      reject(err);
+    }, ms);
+    promise.then(
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+function stripCodeFences(raw: string): string {
+  const trimmed = raw.trim();
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fencedMatch && fencedMatch[1]) {
+    return fencedMatch[1].trim();
+  }
+  return trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+async function generateContentWithRetryAndFallback(
+  ai: GoogleGenAI,
+  request: {
+    contents: any;
+    config?: any;
+  },
+  perAttemptTimeoutMs = 20000
+) {
+  const isRetryableStatus = (err: any) => {
+    const { status } = extractErrorMeta(err);
+    return status === 404 || status === 429 || status === 503 || status === 504;
+  };
+
+  try {
+    return await withTimeout(
+      ai.models.generateContent({
+        model: PRIMARY_GEMINI_MODEL,
+        ...request,
+      }),
+      perAttemptTimeoutMs,
+      "geminiPrimary"
+    );
+  } catch (firstErr: any) {
+    if (!isRetryableStatus(firstErr)) {
+      throw firstErr;
+    }
+    console.warn("[Gemini] primary model failed, retrying in 1s:", extractErrorMeta(firstErr));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    try {
+      return await withTimeout(
+        ai.models.generateContent({
+          model: PRIMARY_GEMINI_MODEL,
+          ...request,
+        }),
+        perAttemptTimeoutMs,
+        "geminiRetry"
+      );
+    } catch (secondErr: any) {
+      if (!isRetryableStatus(secondErr)) {
+        throw secondErr;
+      }
+      console.warn(
+        `[Gemini] retry failed, falling back to ${FALLBACK_GEMINI_MODEL}:`,
+        extractErrorMeta(secondErr)
+      );
+      return await withTimeout(
+        ai.models.generateContent({
+          model: FALLBACK_GEMINI_MODEL,
+          ...request,
+        }),
+        perAttemptTimeoutMs,
+        "geminiFallback"
+      );
+    }
+  }
+}
+
 function resolveLanguageMeta(input?: string): LanguageMeta {
   if (!input || typeof input !== "string") {
     return LANGUAGE_META_MAP.en;
@@ -135,7 +280,7 @@ const INDIC_DRUG_NAME_DENYLIST_REGEX =
   /(पैरासिटामोल|पेरासिटामोल|डोलो|क्रोसिन|इबुप्रोफेन|एस्पिरिन|डिस्प्रिन|कॉम्बीफ्लेम|सिट्रिजिन|एज़िथ्रोमाइसिन|अमोक्सिसिलिन|पैंटोप्राजोल|ओमेप्राजोल|मेटफॉर्मिन|पॅरासिटामॉल|पॅरासिटामोल|डोलो\s*650|प्यारासिटामोल|প্যারাসিটামল|ডলো|ক্রোসিন|আইবুপ্রোফেন|অ্যাসপিরিন|সিটিরিজিন|অ্যাজিথ্রোমাইসিন|মেটফরমিন|ਪੈਰਾਸੀਟਾਮੋਲ|ਡੋਲੋ|ક્રોસિન|પેરાસિટામોલ|ડોલો|பாராசிட்டமால்|டோலோ|குரோசின்|இபுப்ரோஃபன்|செட்டிரிசின்|அசித்ரோமைசின்|పారాసిటమాల్|డోలో|క్రోసిన్|ఇబుప్రోఫెన్|సెటిరిజైన్|అజిత్రోమైసిన్|ಪ್ಯಾರಸಿಟಮಾಲ್|ಡೊಲೊ|ಕ್ರೋಸಿನ್|പാരസെറ്റമോൾ|ഡോളോ|ക്രോസിൻ|ପାରାସିଟାମଲ୍|ଡୋଲୋ)/u;
 
 const USER_ASKS_FOR_MEDICINE_REGEX =
-  /(\b(which|what)\s+(tablet|medicine|pill|drug|syrup|antibiotic|painkiller|capsule|dose|medication)\b|\b(suggest|recommend|prescribe|give|tell)\s+(me\s+)?(a\s+|some\s+|any\s+)?(tablet|medicine|pill|drug|syrup|antibiotic|painkiller|remedy)\b|\b(tablet|medicine|pill)\s+for\s+(fever|headache|pain|cold|cough|acidity|stomach|diabetes|bp)\b|कौन\s*सी\s*(दवा|दवाई|गोली|टैबलेट)|कवन\s*(दवाई|गोली)|कुणसी\s*(दवाई|गोळी)|कौणसी\s*दवाई|कोणती\s*(गोळी|औषध)|कोणते\s*औषध|কোন\s*(ওষুধ|ট্যাবলেট|বড়ি)|কি\s*ওষুধ\s*খাব|কোনটো\s*(ঔষধ|টেবলেট)|ਕਿਹੜੀ\s*(ਦਵਾਈ|ਗੋਲੀ)|કઈ\s*(દવા|ગોળી)|எந்த\s*(மாத்திரை|மருந்து)|என்ன\s*(மாத்திரை|மருந்து)|ఏ\s*(మాత్ర|మందు|టాబ్లెట్)|ಯಾವ\s*(ಮಾತ್ರೆ|ಔಷಧಿ)|ഏത്\s*(ഗുളിക|മരുന്ന്)|କେଉଁ\s*(ଔଷଧ|ଟାବଲେଟ୍|ବଟିକା)|किम्\s*औषधम्|का\s*गुलिका)/iu;
+  /(\b(which|what)\s+(tablet|medicine|pill|drug|syrup|antibiotic|painkiller|capsule|dose|medication)\b|\b(suggest|recommend|prescribe|give|tell)\s+(me\s+)?(a\s+|some\s+|any\s+)?(tablet|medicine|pill|drug|syrup|antibiotic|painkiller|remedy)\b|\b(tablet|medicine|pill)\s+for\s+(fever|headache|pain|cold|cough|acidity|stomach|diabetes|bp)\b|कौन[\s-]*(सी|सा)\s*(दवा|दवाई|गोली|टैबलेट|सिरप|कैप्सूल)|कवन\s*(दवाई|गोली)|कुणसी\s*(दवाई|गोळी)|कौणसी\s*दवाई|कोणती\s*(गोळी|औषध)|कोणते\s*औषध|কোন\s*(ওষুধ|ট্যাবলেট|বড়ি)|কি\s*ওষুধ\s*খাব|কোনটো\s*(ঔষধ|টেবলেট)|ਕਿਹੜੀ\s*(ਦਵਾਈ|ਗੋਲੀ)|કઈ\s*(દવા|ગોળી)|எந்த\s*(மாத்திரை|மருந்து)|என்ன\s*(மாத்திரை|மருந்து)|ఏ\s*(మాత్ర|మందు|టాబ్లెట్)|ಯಾವ\s*(ಮಾತ್ರೆ|ಔಷಧಿ)|ഏത്\s*(ഗുളിക|മരുന്ന്)|କେଉଁ\s*(ଔଷଧ|ଟାବଲେଟ୍|ବଟିକା)|किम्\s*औषधम्|का\s*गुलिका)/iu;
 
 function replyViolatesMedicineRule(replyText: string, userMessage: string): boolean {
   if (!replyText) return false;
@@ -411,8 +556,15 @@ async function startServer() {
     next();
   });
 
-  // Support up to 15MB JSON bodies for base64 PDF/image uploads
-  app.use(express.json({ limit: "15mb" }));
+  // Explicitly handle OPTIONS preflight across every /api route
+  app.options("/api/*", (_req, res) => {
+    return res.sendStatus(204);
+  });
+
+  // Allow 15MB for base64 PDF/image/audio routes and 1MB JSON limit for chat & default routes
+  app.use("/api/analyze", express.json({ limit: "15mb" }));
+  app.use("/api/transcribe", express.json({ limit: "15mb" }));
+  app.use(express.json({ limit: "1mb" }));
 
   // Intercept /@vite/client so the browser never attempts to open a Vite HMR WebSocket in development
   if (process.env.NODE_ENV !== "production") {
@@ -422,6 +574,46 @@ async function startServer() {
       res.send(NO_WS_VITE_CLIENT);
     });
   }
+
+  // Diagnostic endpoint (never exposes API key)
+  app.get("/api/diagnose", async (_req, res) => {
+    const ai = getAiClient();
+    if (!ai) {
+      return res.status(200).json({
+        keyPresent: false,
+        geminiOk: false,
+        errorType: "MISSING_GEMINI_API_KEY",
+      });
+    }
+
+    try {
+      const response = await withTimeout(
+        generateContentWithRetryAndFallback(
+          ai,
+          {
+            contents: "Reply with OK",
+          },
+          5000
+        ),
+        15000,
+        "diagnose"
+      );
+      const ok = Boolean((response.text ?? "").trim());
+      return res.status(200).json({
+        keyPresent: true,
+        geminiOk: ok,
+        errorType: ok ? null : "EMPTY_RESPONSE",
+      });
+    } catch (err: any) {
+      const meta = extractErrorMeta(err);
+      console.error("[/api/diagnose] failed:", meta);
+      return res.status(200).json({
+        keyPresent: true,
+        geminiOk: false,
+        errorType: `${meta.name}_${meta.status}`,
+      });
+    }
+  });
 
   app.post("/api/analyze", async (req, res) => {
     try {
@@ -589,13 +781,11 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
 
       const ai = getAiClient();
       if (!ai) {
-        return res.status(503).json({
-          error:
-            "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to analyze reports.",
-        });
+        const msg =
+          "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to analyze reports.";
+        return res.status(503).json({ error: msg, message: msg });
       }
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite",
+      const response = await generateContentWithRetryAndFallback(ai, {
         contents: { parts },
         config: {
           systemInstruction: `${SYSTEM_INSTRUCTION}\n\n${buildMultilingualAiBehaviorBlock(
@@ -612,13 +802,12 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
 
       const rawText = (response.text ?? "").trim();
       if (!rawText) {
-        return res.status(502).json({
-          error:
-            "We couldn't get a clear response right now. Please take a breath and try again in a moment.",
-        });
+        const msg =
+          "We couldn't get a clear response right now. Please take a breath and try again in a moment.";
+        return res.status(502).json({ error: msg, message: msg });
       }
 
-      const parsed = JSON.parse(rawText);
+      const parsed = JSON.parse(stripCodeFences(rawText));
 
       // Normalize all numbers to Western digits 0-9 across fields
       if (typeof parsed.summary === "string") {
@@ -658,28 +847,26 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
 
       return res.json(parsed);
     } catch (error: any) {
-      console.error("Gemini analysis error:", error);
-      const msg: string = error?.message || "";
-      if (
-        msg.includes("API_KEY_INVALID") ||
-        msg.includes("PERMISSION_DENIED") ||
-        msg.includes("403")
-      ) {
-        return res.status(403).json({
-          error:
-            "The Gemini API key could not be verified. Please check your API key configuration in the Settings > Secrets panel.",
-        });
+      const meta = extractErrorMeta(error);
+      console.error("[/api/analyze] error:", meta);
+      if (meta.status === 403 || meta.status === 401) {
+        const msg =
+          "The Gemini API key could not be verified. Please check your GEMINI_API_KEY environment variable.";
+        return res.status(meta.status).json({ error: msg, message: msg });
       }
-      if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("429")) {
-        return res.status(429).json({
-          error:
-            "The service is temporarily busy. Please wait a few seconds or select a billing-enabled API key in Settings > Secrets.",
-        });
+      if (meta.status === 429) {
+        const msg =
+          "The service is temporarily busy. Please wait a few seconds and try again.";
+        return res.status(429).json({ error: msg, message: msg });
       }
-      return res.status(500).json({
-        error:
-          "Something went wrong while reading your document. Please check that the text or file is clear and try again.",
-      });
+      if (meta.status === 503 || meta.status === 504) {
+        const msg =
+          "The service is waking up or temporarily unavailable. Please try again in a moment.";
+        return res.status(meta.status).json({ error: msg, message: msg });
+      }
+      const msg =
+        "Something went wrong while reading your document. Please check that the text or file is clear and try again.";
+      return res.status(meta.status).json({ error: msg, message: msg });
     }
   });
 
@@ -707,13 +894,11 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
 
       const ai = getAiClient();
       if (!ai) {
-        return res.status(503).json({
-          error:
-            "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to transcribe audio.",
-        });
+        const msg =
+          "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to transcribe audio.";
+        return res.status(503).json({ error: msg, message: msg });
       }
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite",
+      const response = await generateContentWithRetryAndFallback(ai, {
         contents: {
           parts: [
             {
@@ -732,11 +917,11 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
       const transcript = toWesternDigits((response.text ?? "").trim());
       return res.json({ transcript });
     } catch (error: any) {
-      console.error("Audio transcription error:", error);
-      return res.status(500).json({
-        error:
-          "We couldn't transcribe that audio clip clearly. Please try dictating again or type your text.",
-      });
+      const meta = extractErrorMeta(error);
+      console.error("[/api/transcribe] error:", meta);
+      const msg =
+        "We couldn't transcribe that audio clip clearly. Please try dictating again or type your text.";
+      return res.status(meta.status).json({ error: msg, message: msg });
     }
   });
 
@@ -832,6 +1017,15 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
       recentTimestamps.push(now);
       chatRateLimitMap.set(clientIp, recentTimestamps);
 
+      if (
+        !req.body ||
+        typeof req.body !== "object" ||
+        Array.isArray(req.body)
+      ) {
+        const msg = "Invalid request body. Please try sending your message again.";
+        return res.status(400).json({ error: msg, message: msg });
+      }
+
       const {
         profile,
         specialty = "General Physician",
@@ -851,17 +1045,15 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
       const fixedSafety =
         FIXED_SAFETY_MESSAGES[langMeta.code] || FIXED_SAFETY_MESSAGES.en;
 
-      if (!profile || typeof profile !== "object") {
-        return res.status(400).json({
-          error:
-            "Please complete your health profile first so your specialist guide can understand your context.",
-        });
+      if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+        const msg =
+          "Please complete your health profile first so your specialist guide can understand your context.";
+        return res.status(400).json({ error: msg, message: msg });
       }
 
       if (!Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({
-          error: "Please type a question or symptom to start the conversation.",
-        });
+        const msg = "Please type a question or symptom to start the conversation.";
+        return res.status(400).json({ error: msg, message: msg });
       }
 
       // Slice to the last 12 messages as required
@@ -880,9 +1072,19 @@ Please explain every item in plain, reassuring language at a 7th-grade reading l
 
       const userText = latestMessage.content.trim();
       if (userText.length > 1000) {
-        return res.status(400).json({
-          error:
-            "Your message is a little long (over 1,000 characters). Please shorten it slightly so we can go through it step by step.",
+        const msg =
+          "Your message is a little long (over 1,000 characters). Please shorten it slightly so we can go through it step by step.";
+        return res.status(400).json({ error: msg, message: msg });
+      }
+
+      const keywordEmergency = matchesEmergencyKeyword(userText);
+      if (keywordEmergency) {
+        return res.json({
+          reply: fixedSafety.emergencyMessage,
+          urgency: "emergency",
+          suggestedSpecialist: "Emergency Medicine / Nearest Hospital (112)",
+          reasonForReferral: fixedSafety.emergencyMessage,
+          followUpQuestions: [],
         });
       }
 
@@ -940,15 +1142,13 @@ Referral and urgency rules (set the 'urgency' field):
 
       const ai = getAiClient();
       if (!ai) {
-        return res.status(503).json({
-          error:
-            "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to chat with a specialist.",
-        });
+        const msg =
+          "Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable to chat with a specialist.";
+        return res.status(503).json({ error: msg, message: msg });
       }
 
-      // Run main chat call and parallel emergency classifier across all 15 languages
-      const mainChatPromise = ai.models.generateContent({
-        model: "gemini-3.1-flash-lite",
+      // Run main chat call and isolated 4s emergency classifier in parallel
+      const mainChatPromise = generateContentWithRetryAndFallback(ai, {
         contents: {
           parts: [
             {
@@ -970,55 +1170,79 @@ Respond to the patient's latest message in ${langDisplay} (written in ${langMeta
         },
       });
 
-      const emergencyClassifierPromise = ai.models
-        .generateContent({
-          model: "gemini-3.1-flash-lite",
-          contents: {
-            parts: [
-              {
-                text: `Classify whether this patient message (which may be in any Indian language, English, or Romanized script) describes a medical emergency such as chest pain, chest pressure, difficulty breathing, stroke signs, severe bleeding, fainting, seizure, severe allergic reaction, dangerously high/low blood sugar with confusion, or self-harm.\n\nPatient message: "${userText}"`,
+      const emergencyClassifierPromise = (async (): Promise<boolean> => {
+        try {
+          const emergencyCheckRes = await withTimeout(
+            ai.models.generateContent({
+              model: PRIMARY_GEMINI_MODEL,
+              contents: {
+                parts: [
+                  {
+                    text: `Classify whether this patient message (which may be in any Indian language, English, or Romanized script) describes a medical emergency such as chest pain, chest pressure, difficulty breathing, stroke signs, severe bleeding, fainting, seizure, severe allergic reaction, dangerously high/low blood sugar with confusion, or self-harm.\n\nPatient message: "${userText}"`,
+                  },
+                ],
               },
-            ],
-          },
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: EMERGENCY_CLASSIFIER_SCHEMA,
-          },
-        })
-        .catch(() => null);
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: EMERGENCY_CLASSIFIER_SCHEMA,
+              },
+            }),
+            4000,
+            "emergencyClassifier"
+          );
+          const rawClassifierText = (emergencyCheckRes?.text ?? "").trim();
+          if (!rawClassifierText) return false;
+          const parsedClassifier = JSON.parse(stripCodeFences(rawClassifierText));
+          return Boolean(parsedClassifier?.emergency);
+        } catch (err: any) {
+          console.warn("[emergencyClassifier] fallback to keyword list:", extractErrorMeta(err));
+          return false;
+        }
+      })();
 
-      const [response, emergencyCheckRes] = await Promise.all([
+      const [response, classifierEmergency] = await Promise.all([
         mainChatPromise,
         emergencyClassifierPromise,
       ]);
 
-      let classifierEmergency = false;
-      if (emergencyCheckRes && emergencyCheckRes.text) {
-        try {
-          const parsedClassifier = JSON.parse(emergencyCheckRes.text.trim());
-          classifierEmergency = Boolean(parsedClassifier?.emergency);
-        } catch {
-          classifierEmergency = false;
-        }
-      }
-
-      const keywordEmergency = matchesEmergencyKeyword(userText);
-
       const rawText = (response.text ?? "").trim();
       if (!rawText) {
-        return res.status(502).json({
-          error:
-            "Your specialist guide couldn't respond clearly just now. Please tap retry in a moment.",
-        });
+        const msg =
+          "Your specialist guide couldn't respond clearly just now. Please tap retry in a moment.";
+        return res.status(502).json({ error: msg, message: msg });
       }
 
-      const parsed = JSON.parse(rawText) as {
+      const cleanedRawText = stripCodeFences(rawText);
+      let parsed: {
         reply?: string;
         urgency?: "none" | "routine" | "soon" | "urgent" | "emergency";
         suggestedSpecialist?: string | null;
         reasonForReferral?: string | null;
         followUpQuestions?: string[];
       };
+
+      try {
+        const jsonParsed = JSON.parse(cleanedRawText);
+        if (jsonParsed && typeof jsonParsed === "object" && !Array.isArray(jsonParsed)) {
+          parsed = jsonParsed;
+        } else {
+          parsed = {
+            reply: cleanedRawText,
+            urgency: "none",
+            suggestedSpecialist: null,
+            reasonForReferral: null,
+            followUpQuestions: [],
+          };
+        }
+      } catch {
+        parsed = {
+          reply: cleanedRawText,
+          urgency: "none",
+          suggestedSpecialist: null,
+          reasonForReferral: null,
+          followUpQuestions: [],
+        };
+      }
 
       const validUrgencies = new Set([
         "none",
@@ -1034,7 +1258,7 @@ Respond to the patient's latest message in ${langDisplay} (written in ${langMeta
         | "urgent"
         | "emergency" = validUrgencies.has(parsed.urgency || "")
         ? (parsed.urgency as any)
-        : "routine";
+        : "none";
 
       let finalReply =
         typeof parsed.reply === "string" && parsed.reply.trim()
@@ -1058,40 +1282,44 @@ Respond to the patient's latest message in ${langDisplay} (written in ${langMeta
         });
       }
 
-      // 2. Medicine Guard (/api/chat only): check both deterministic deny-list/request patterns and second Gemini classifier
+      // 2. Medicine Guard (/api/chat only): deterministic deny-list/request patterns + isolated 4s Gemini classifier
       let violatesMedicine = replyViolatesMedicineRule(finalReply, userText);
 
       if (!violatesMedicine) {
         try {
-          const medGuardRes = await ai.models.generateContent({
-            model: "gemini-3.1-flash-lite",
-            contents: {
-              parts: [
-                {
-                  text: `Check this health chatbot interaction (in ${langDisplay}) for medicine safety rules.
+          const medGuardRes = await withTimeout(
+            ai.models.generateContent({
+              model: PRIMARY_GEMINI_MODEL,
+              contents: {
+                parts: [
+                  {
+                    text: `Check this health chatbot interaction (in ${langDisplay}) for medicine safety rules.
 Rule: The assistant must NEVER name, recommend, suggest, compare, or give a dose for any specific medicine, tablet, pill, antibiotic, painkiller, supplement, vitamin, herbal product, or home remedy to treat a condition. Also, if the patient asks which medicine or tablet to take (for example for fever, headache, pain, cold, etc.), the assistant must strictly refuse to name any medicine.
 
 Patient message: "${userText}"
 Assistant reply: "${finalReply}"
 
 Return JSON { "namesMedicine": true } if the assistant named/suggested/dosed any medicine, tablet, supplement, or remedy OR if the patient asked for a medicine/tablet recommendation. Otherwise return { "namesMedicine": false }.`,
-                },
-              ],
-            },
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: MEDICINE_GUARD_SCHEMA,
-            },
-          });
-          const medRaw = (medGuardRes.text ?? "").trim();
+                  },
+                ],
+              },
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: MEDICINE_GUARD_SCHEMA,
+              },
+            }),
+            4000,
+            "medicineGuard"
+          );
+          const medRaw = (medGuardRes?.text ?? "").trim();
           if (medRaw) {
-            const medParsed = JSON.parse(medRaw);
+            const medParsed = JSON.parse(stripCodeFences(medRaw));
             if (medParsed?.namesMedicine === true) {
               violatesMedicine = true;
             }
           }
-        } catch {
-          // Fallback to deterministic check if classifier fails
+        } catch (err: any) {
+          console.warn("[medicineGuard] fallback to keyword list:", extractErrorMeta(err));
         }
       }
 
@@ -1100,9 +1328,7 @@ Return JSON { "namesMedicine": true } if the assistant named/suggested/dosed any
       }
 
       return res.json({
-        reply:
-          finalReply ||
-          fixedSafety.medicineRefusalMessage,
+        reply: finalReply || fixedSafety.medicineRefusalMessage,
         urgency: normalizedUrgency,
         suggestedSpecialist:
           normalizedUrgency === "none"
@@ -1126,29 +1352,59 @@ Return JSON { "namesMedicine": true } if the assistant named/suggested/dosed any
           : [],
       });
     } catch (error: any) {
-      const msg: string = error?.message || "";
-      if (
-        msg.includes("API_KEY_INVALID") ||
-        msg.includes("PERMISSION_DENIED") ||
-        msg.includes("403")
-      ) {
-        return res.status(403).json({
-          error:
-            "The Gemini API key could not be verified. Please check your API key configuration in the Settings > Secrets panel.",
-        });
+      const meta = extractErrorMeta(error);
+      console.error("[/api/chat] error:", meta);
+      if (meta.status === 403 || meta.status === 401) {
+        const msg =
+          "The Gemini API key could not be verified. Please check your GEMINI_API_KEY environment variable.";
+        return res.status(meta.status).json({ error: msg, message: msg });
       }
-      if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("429")) {
-        return res.status(429).json({
-          error:
-            "The specialist service is momentarily busy. Please wait a few seconds and tap Retry.",
-        });
+      if (meta.status === 429) {
+        const msg =
+          "The specialist service is momentarily busy. Please wait a few seconds and tap Retry.";
+        return res.status(429).json({ error: msg, message: msg });
       }
-      return res.status(500).json({
-        error:
-          "We couldn't reach your specialist guide right now. Please take a breath and tap Retry.",
-      });
+      if (meta.status === 503 || meta.status === 504) {
+        const msg =
+          "The specialist service is temporarily unavailable or waking up. Please tap Retry in a moment.";
+        return res.status(meta.status).json({ error: msg, message: msg });
+      }
+      if (meta.status === 400) {
+        const msg =
+          "Your message could not be processed as sent. Please check your input and try again.";
+        return res.status(400).json({ error: msg, message: msg });
+      }
+      const msg =
+        "We couldn't reach your specialist guide right now. Please take a breath and tap Retry.";
+      return res.status(meta.status).json({ error: msg, message: msg });
     }
   });
+
+  // Ensure JSON body parser or unexpected API errors always return structured JSON
+  app.use(
+    (
+      err: any,
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction
+    ) => {
+      if (!req.path.startsWith("/api/")) {
+        return next(err);
+      }
+      const meta = extractErrorMeta(err);
+      if (err?.type === "entity.too.large") {
+        const msg = "Request payload is too large.";
+        return res.status(413).json({ error: msg, message: msg });
+      }
+      if (err instanceof SyntaxError && "body" in err) {
+        const msg = "Invalid JSON in request body.";
+        return res.status(400).json({ error: msg, message: msg });
+      }
+      console.error("[/api/*] unexpected error:", meta);
+      const msg = "An unexpected server error occurred. Please try again.";
+      return res.status(meta.status).json({ error: msg, message: msg });
+    }
+  );
 
   if (process.env.NODE_ENV !== "production") {
     let viteMiddleware: express.RequestHandler | null = null;

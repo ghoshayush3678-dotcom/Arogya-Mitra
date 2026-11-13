@@ -456,6 +456,7 @@ export interface TranslationDictionary {
     suggestedSpecialistPrefix: string;
     findDoctorNearMeBtn: string;
     thinkingStatus: string; // uses {specialty}
+    wakingUpStatus: string;
     retryBtn: string;
     inputPlaceholder: string;
     sendBtn: string;

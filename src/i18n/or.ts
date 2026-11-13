@@ -298,6 +298,7 @@ const or: TranslationDictionary = {
     suggestedSpecialistPrefix: "ପରାମର୍ଶିତ ବିଶେଷଜ୍ଞ:",
     findDoctorNearMeBtn: "ମୋ ପାଖରେ ଡାକ୍ତର ଖୋଜନ୍ତୁ",
     thinkingStatus: "{specialty} ଗାଇଡ୍ ଭାବୁଛନ୍ତି…",
+    wakingUpStatus: "ଆମର ସର୍ଭର ଆରମ୍ଭ ହେଉଛି, ଏଥିରେ ଏକ ମିନିଟ୍ ପର୍ଯ୍ୟନ୍ତ ସମୟ ଲାଗିପାରେ…",
     retryBtn: "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
     inputPlaceholder:
       "ଆପଣ କ'ଣ ଅନୁଭବ କରୁଛନ୍ତି ବିଶେଷଜ୍ଞ ଗାଇଡ୍‌ଙ୍କୁ କୁହନ୍ତୁ… (ପଠାଇବାକୁ Enter, ନୂଆ ଧାଡ଼ି ପାଇଁ Shift+Enter)",

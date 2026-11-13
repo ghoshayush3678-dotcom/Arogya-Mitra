@@ -298,6 +298,7 @@ const bho: TranslationDictionary = {
     suggestedSpecialistPrefix: "सुझावल विशेषज्ञ:",
     findDoctorNearMeBtn: "आस-पास डॉक्टर खोजीं",
     thinkingStatus: "{specialty} गाइड सोच रहल बाड़ें…",
+    wakingUpStatus: "हमार सर्वर जाग रहल बा, एहमें एक मिनट तक लाग सकेला…",
     retryBtn: "फिर से कोशिश करीं",
     inputPlaceholder:
       "राउर का तकलीफ बा, अपना विशेषज्ञ गाइड के बताईं… (भेजे खातिर Enter, नया लाइन खातिर Shift+Enter)",

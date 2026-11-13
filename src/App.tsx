@@ -1041,6 +1041,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<SpecialistChatMessage[]>([]);
   const [chatInput, setChatInput] = useState<string>("");
   const [isChatLoading, setIsChatLoading] = useState<boolean>(false);
+  const [isChatWakingUp, setIsChatWakingUp] = useState<boolean>(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [lastFailedUserMessage, setLastFailedUserMessage] = useState<
     string | null
@@ -1105,6 +1106,18 @@ export default function App() {
       rootEl.classList.remove("dark");
     }
   }, [themeMode]);
+
+  // Silently wake the Render backend on page load and keep it warm every 9 minutes
+  useEffect(() => {
+    const pingHealth = () => {
+      fetch(`${API_BASE}/healthz`, { method: "GET", cache: "no-store" }).catch(
+        () => {}
+      );
+    };
+    pingHealth();
+    const intervalId = window.setInterval(pingHealth, 9 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   // Crossfade loading messages every 2.5 seconds
   useEffect(() => {
@@ -1248,7 +1261,12 @@ export default function App() {
     historyToSend: SpecialistChatMessage[]
   ) => {
     setIsChatLoading(true);
+    setIsChatWakingUp(false);
     setChatError(null);
+
+    const wakingTimerId = window.setTimeout(() => {
+      setIsChatWakingUp(true);
+    }, 8000);
 
     try {
       const payloadMessages = historyToSend.slice(-12).map((m) => ({
@@ -1258,36 +1276,63 @@ export default function App() {
       const currentMeta =
         LANGUAGE_META_MAP[languageCode] || LANGUAGE_META_MAP.en;
 
-      const response = await fetch(`${API_BASE}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const requestBody = JSON.stringify({
+        profile: {
+          name: userProfile.name.trim(),
+          age: userProfile.age.trim(),
+          sex: userProfile.sex.trim(),
+          bloodType: userProfile.bloodType.trim(),
+          diabetesStatus: userProfile.sugar.trim(),
+          allergies: userProfile.allergy.trim(),
+          bloodPressureAndFluidConditions: userProfile.bloodPressure.trim(),
+          existingConditions: userProfile.existingConditions.trim(),
+          height: userProfile.height.trim(),
+          weight: userProfile.weight.trim(),
+          otherDetails: userProfile.otherDetails.trim(),
         },
-        body: JSON.stringify({
-          profile: {
-            name: userProfile.name.trim(),
-            age: userProfile.age.trim(),
-            sex: userProfile.sex.trim(),
-            bloodType: userProfile.bloodType.trim(),
-            diabetesStatus: userProfile.sugar.trim(),
-            allergies: userProfile.allergy.trim(),
-            bloodPressureAndFluidConditions: userProfile.bloodPressure.trim(),
-            existingConditions: userProfile.existingConditions.trim(),
-            height: userProfile.height.trim(),
-            weight: userProfile.weight.trim(),
-            otherDetails: userProfile.otherDetails.trim(),
-          },
-          specialty: selectedSpecialty,
-          languageCode,
-          language: currentMeta.englishName,
-          messages: payloadMessages,
-        }),
+        specialty: selectedSpecialty,
+        languageCode,
+        language: currentMeta.englishName,
+        messages: payloadMessages,
       });
+
+      const attemptChatFetch = async (): Promise<Response> => {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 90000);
+        try {
+          return await fetch(`${API_BASE}/api/chat`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: requestBody,
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+      };
+
+      let response: Response;
+      try {
+        response = await attemptChatFetch();
+      } catch (firstErr: any) {
+        const isTimeoutOrNetwork =
+          firstErr?.name === "AbortError" ||
+          firstErr instanceof TypeError ||
+          /network|fetch|timeout|aborted/i.test(String(firstErr?.message || ""));
+        if (!isTimeoutOrNetwork) {
+          throw firstErr;
+        }
+        // Automatically retry once on network error or timeout
+        response = await attemptChatFetch();
+      }
 
       const data = await response.json().catch(() => null);
       if (!response.ok || !data) {
         throw new Error(
           data?.error ||
+            data?.message ||
             "We couldn't reach your specialist guide right now. Please take a breath and tap Retry."
         );
       }
@@ -1315,11 +1360,15 @@ export default function App() {
       setChatMessages((prev) => [...prev, botMsg]);
       setLastFailedUserMessage(null);
     } catch (err: any) {
-      setChatError(
-        err?.message ||
-          "Something paused while connecting to your specialist guide. Please tap Retry."
-      );
+      const msg =
+        err?.name === "AbortError"
+          ? "The server took too long to respond while waking up. Please tap Retry to send your message again."
+          : err?.message ||
+            "Something paused while connecting to your specialist guide. Please tap Retry.";
+      setChatError(msg);
     } finally {
+      window.clearTimeout(wakingTimerId);
+      setIsChatWakingUp(false);
       setIsChatLoading(false);
     }
   };
@@ -6479,10 +6528,13 @@ export default function App() {
                     >
                       <div className="flex items-center gap-2 pl-1">
                         <span className="font-serif text-sm font-medium text-[#1F4E4A] dark:text-[#8CE0C0]">
-                          {t.chat.thinkingStatus.replace(
-                            "{specialty}",
-                            t.chat.specialists[selectedSpecialty]?.label || selectedSpecialty
-                          )}
+                          {isChatWakingUp
+                            ? t.chat.wakingUpStatus
+                            : t.chat.thinkingStatus.replace(
+                                "{specialty}",
+                                t.chat.specialists[selectedSpecialty]?.label ||
+                                  selectedSpecialty
+                              )}
                         </span>
                       </div>
                       <div className="rounded-[20px] px-5 py-4 bg-[#DCE8E2] dark:bg-[#1B332E] border border-[#1F4E4A]/12 dark:border-[#8CE0C0]/20 inline-flex items-center gap-2">

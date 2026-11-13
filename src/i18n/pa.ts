@@ -292,6 +292,7 @@ const pa: TranslationDictionary = {
     suggestedSpecialistPrefix: "ਸੁਝਾਏ ਗਏ ਮਾਹਿਰ:",
     findDoctorNearMeBtn: "ਮੇਰੇ ਨੇੜੇ ਡਾਕਟਰ ਲੱਭੋ",
     thinkingStatus: "{specialty} ਗਾਈਡ ਸੋਚ ਰਹੇ ਹਨ…",
+    wakingUpStatus: "ਸਾਡਾ ਸਰਵਰ ਜਾਗ ਰਿਹਾ ਹੈ, ਇਸ ਵਿੱਚ ਇੱਕ ਮਿੰਟ ਤੱਕ ਲੱਗ ਸਕਦਾ ਹੈ…",
     retryBtn: "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
     inputPlaceholder:
       "ਆਪਣੇ ਮਾਹਿਰ ਗਾਈਡ ਨੂੰ ਦੱਸੋ ਕਿ ਤੁਹਾਨੂੰ ਕੀ ਮਹਿਸੂਸ ਹੋ ਰਿਹਾ ਹੈ… (ਭੇਜਣ ਲਈ Enter, ਨਵੀਂ ਲਾਈਨ ਲਈ Shift+Enter)",
