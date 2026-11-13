@@ -360,7 +360,15 @@ async function startServer() {
   const rawAllowedOrigin = process.env.ALLOWED_ORIGIN || "";
   const configuredOrigins = rawAllowedOrigin
     .split(",")
-    .map((s) => s.trim().replace(/\/+$/, ""))
+    .map((s) => {
+      const trimmed = s.trim().replace(/\/+$/, "");
+      if (!trimmed || trimmed === "*") return trimmed;
+      try {
+        return new URL(trimmed).origin;
+      } catch {
+        return trimmed;
+      }
+    })
     .filter(Boolean);
 
   const allowedOrigins = [

@@ -59,8 +59,7 @@ import {
   type TranslationDictionary,
 } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
-
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+import { API_BASE } from "./config/api";
 
 export type ItemStatus = "normal" | "slightly_high" | "slightly_low" | "discuss_soon";
 export type ItemType = "lab" | "medicine";
