@@ -32,11 +32,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check API key is set
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "${GEMINI_API_KEY}" ]; then
+            echo "::error::GEMINI_API_KEY repository secret is missing or empty."
+            exit 1
+          fi
+          echo "GEMINI_API_KEY is configured."
+
       - name: Build frontend
         run: npm run build
         env:
           VITE_BASE: /${{ github.event.repository.name }}/
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

@@ -33,7 +33,13 @@ function githubPagesPlugin(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const geminiApiKey = (process.env.GEMINI_API_KEY || env.GEMINI_API_KEY || '').trim();
+  const geminiApiKey = (
+    process.env.GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    env.GEMINI_API_KEY ||
+    env.VITE_GEMINI_API_KEY ||
+    ''
+  ).trim();
   return {
     base: process.env.VITE_BASE || '/',
     define: {
