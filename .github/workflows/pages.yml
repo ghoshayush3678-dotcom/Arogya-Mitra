@@ -36,7 +36,7 @@ jobs:
         run: npm run build
         env:
           VITE_BASE: /${{ github.event.repository.name }}/
-          VITE_API_URL: ${{ vars.VITE_API_URL || secrets.VITE_API_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

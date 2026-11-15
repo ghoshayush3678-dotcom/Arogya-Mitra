@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,9 +31,14 @@ function githubPagesPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const geminiApiKey = (process.env.GEMINI_API_KEY || env.GEMINI_API_KEY || '').trim();
   return {
     base: process.env.VITE_BASE || '/',
+    define: {
+      'process.env.GEMINI_API_KEY': JSON.stringify(geminiApiKey),
+    },
     plugins: [react(), tailwindcss(), githubPagesPlugin()],
     resolve: {
       alias: {

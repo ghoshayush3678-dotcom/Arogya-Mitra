@@ -552,5 +552,12 @@ export interface TranslationDictionary {
     messageTooLong: string;
     genericAnalyzeError: string;
     genericChatError: string;
+    apiKeyMissing: string;
+    status400: string;
+    status403: string;
+    status404: string;
+    status429: string;
+    status503: string;
+    requestTimeout: string;
   };
 }

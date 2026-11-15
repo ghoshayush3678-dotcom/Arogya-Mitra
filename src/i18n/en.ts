@@ -473,6 +473,19 @@ const en: TranslationDictionary = {
       "We couldn't complete the explanation right now. Please check your input and try again.",
     genericChatError:
       "We couldn't reach your specialist guide right now. Please take a breath and tap Retry.",
+    apiKeyMissing: "The API key is missing in this build.",
+    status400:
+      "The API key is invalid (400). Please check the API key setup and tap Retry.",
+    status403:
+      "The API key is blocked or restricted (403). Please check key restrictions and tap Retry.",
+    status404:
+      "The AI model name is wrong or unavailable (404). Please check the model name and tap Retry.",
+    status429:
+      "AI quota reached (429). Please wait about a minute and try again.",
+    status503:
+      "The AI service is busy right now (503). Please tap Retry in a moment.",
+    requestTimeout:
+      "The AI service took too long to respond. Please tap Retry.",
   },
 };
 

@@ -59,7 +59,12 @@ import {
   type TranslationDictionary,
 } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
-import { API_BASE } from "./config/api";
+import {
+  analyzeMedicalDocument,
+  sendSpecialistChat,
+  transcribeMedicalAudio,
+  formatGeminiErrorMessage,
+} from "./utils/geminiClient";
 
 export type ItemStatus = "normal" | "slightly_high" | "slightly_low" | "discuss_soon";
 export type ItemType = "lab" | "medicine";
@@ -1041,7 +1046,6 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<SpecialistChatMessage[]>([]);
   const [chatInput, setChatInput] = useState<string>("");
   const [isChatLoading, setIsChatLoading] = useState<boolean>(false);
-  const [isChatWakingUp, setIsChatWakingUp] = useState<boolean>(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [lastFailedUserMessage, setLastFailedUserMessage] = useState<
     string | null
@@ -1106,18 +1110,6 @@ export default function App() {
       rootEl.classList.remove("dark");
     }
   }, [themeMode]);
-
-  // Silently wake the Render backend on page load and keep it warm every 9 minutes
-  useEffect(() => {
-    const pingHealth = () => {
-      fetch(`${API_BASE}/healthz`, { method: "GET", cache: "no-store" }).catch(
-        () => {}
-      );
-    };
-    pingHealth();
-    const intervalId = window.setInterval(pingHealth, 9 * 60 * 1000);
-    return () => window.clearInterval(intervalId);
-  }, []);
 
   // Crossfade loading messages every 2.5 seconds
   useEffect(() => {
@@ -1261,12 +1253,7 @@ export default function App() {
     historyToSend: SpecialistChatMessage[]
   ) => {
     setIsChatLoading(true);
-    setIsChatWakingUp(false);
     setChatError(null);
-
-    const wakingTimerId = window.setTimeout(() => {
-      setIsChatWakingUp(true);
-    }, 8000);
 
     try {
       const payloadMessages = historyToSend.slice(-12).map((m) => ({
@@ -1276,7 +1263,7 @@ export default function App() {
       const currentMeta =
         LANGUAGE_META_MAP[languageCode] || LANGUAGE_META_MAP.en;
 
-      const requestBody = JSON.stringify({
+      const data = await sendSpecialistChat({
         profile: {
           name: userProfile.name.trim(),
           age: userProfile.age.trim(),
@@ -1295,47 +1282,6 @@ export default function App() {
         language: currentMeta.englishName,
         messages: payloadMessages,
       });
-
-      const attemptChatFetch = async (): Promise<Response> => {
-        const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 90000);
-        try {
-          return await fetch(`${API_BASE}/api/chat`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: requestBody,
-            signal: controller.signal,
-          });
-        } finally {
-          window.clearTimeout(timeoutId);
-        }
-      };
-
-      let response: Response;
-      try {
-        response = await attemptChatFetch();
-      } catch (firstErr: any) {
-        const isTimeoutOrNetwork =
-          firstErr?.name === "AbortError" ||
-          firstErr instanceof TypeError ||
-          /network|fetch|timeout|aborted/i.test(String(firstErr?.message || ""));
-        if (!isTimeoutOrNetwork) {
-          throw firstErr;
-        }
-        // Automatically retry once on network error or timeout
-        response = await attemptChatFetch();
-      }
-
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data) {
-        throw new Error(
-          data?.error ||
-            data?.message ||
-            "We couldn't reach your specialist guide right now. Please take a breath and tap Retry."
-        );
-      }
 
       const botMsg: SpecialistChatMessage = {
         id: `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1360,15 +1306,10 @@ export default function App() {
       setChatMessages((prev) => [...prev, botMsg]);
       setLastFailedUserMessage(null);
     } catch (err: any) {
-      const msg =
-        err?.name === "AbortError"
-          ? "The server took too long to respond while waking up. Please tap Retry to send your message again."
-          : err?.message ||
-            "Something paused while connecting to your specialist guide. Please tap Retry.";
-      setChatError(msg);
+      setChatError(
+        formatGeminiErrorMessage(err, t.errors, t.errors.genericChatError)
+      );
     } finally {
-      window.clearTimeout(wakingTimerId);
-      setIsChatWakingUp(false);
       setIsChatLoading(false);
     }
   };
@@ -1533,56 +1474,41 @@ export default function App() {
       const currentMeta =
         LANGUAGE_META_MAP[languageCode] || LANGUAGE_META_MAP.en;
 
-      const response = await fetch(`${API_BASE}/api/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const data = await analyzeMedicalDocument({
+        mode: targetMode,
+        text:
+          targetMode === "upload"
+            ? targetText.trim()
+              ? profilePromptContext
+                ? `${targetText.trim()}\n\n[${profilePromptContext}]`
+                : targetText.trim()
+              : profilePromptContext
+            : trimmedTextWithProfile,
+        file:
+          targetMode === "upload" && uploadedFile
+            ? {
+                base64: uploadedFile.base64,
+                mimeType: uploadedFile.mimeType,
+                name: uploadedFile.name,
+              }
+            : undefined,
+        languageCode,
+        language: currentMeta.englishName,
+        userProfile: {
+          name: userProfile.name.trim(),
+          age: userProfile.age.trim(),
+          sex: userProfile.sex.trim(),
+          bloodType: userProfile.bloodType.trim(),
+          sugar: userProfile.sugar.trim(),
+          allergy: userProfile.allergy.trim(),
+          bloodPressure: userProfile.bloodPressure.trim(),
+          existingConditions: userProfile.existingConditions.trim(),
+          height: userProfile.height.trim(),
+          weight: userProfile.weight.trim(),
+          otherDetails: userProfile.otherDetails.trim(),
         },
-        body: JSON.stringify({
-          mode: targetMode,
-          text:
-            targetMode === "upload"
-              ? targetText.trim()
-                ? profilePromptContext
-                  ? `${targetText.trim()}\n\n[${profilePromptContext}]`
-                  : targetText.trim()
-                : profilePromptContext
-              : trimmedTextWithProfile,
-          file:
-            targetMode === "upload" && uploadedFile
-              ? {
-                  base64: uploadedFile.base64,
-                  mimeType: uploadedFile.mimeType,
-                  name: uploadedFile.name,
-                }
-              : undefined,
-          languageCode,
-          language: currentMeta.englishName,
-          userProfile: {
-            name: userProfile.name.trim(),
-            age: userProfile.age.trim(),
-            sex: userProfile.sex.trim(),
-            bloodType: userProfile.bloodType.trim(),
-            sugar: userProfile.sugar.trim(),
-            allergy: userProfile.allergy.trim(),
-            bloodPressure: userProfile.bloodPressure.trim(),
-            existingConditions: userProfile.existingConditions.trim(),
-            height: userProfile.height.trim(),
-            weight: userProfile.weight.trim(),
-            otherDetails: userProfile.otherDetails.trim(),
-          },
-          profilePromptContext,
-        }),
+        profilePromptContext,
       });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok || !data) {
-        throw new Error(
-          data?.error ||
-            "We ran into a quiet hiccup while reading your document. Please try again."
-        );
-      }
 
       const analyzedResult = data as AnalysisResult;
       setResult(analyzedResult);
@@ -1653,8 +1579,7 @@ export default function App() {
       }, 120);
     } catch (err: any) {
       setErrorMessage(
-        err?.message ||
-          "We couldn't complete the explanation right now. Please check your input and try again."
+        formatGeminiErrorMessage(err, t.errors, t.errors.genericAnalyzeError)
       );
     } finally {
       setIsLoading(false);
@@ -1851,34 +1776,26 @@ export default function App() {
           const currentMeta =
             LANGUAGE_META_MAP[languageCode] || LANGUAGE_META_MAP.en;
 
-          const res = await fetch(`${API_BASE}/api/transcribe`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              audioBase64: base64Audio,
-              mimeType,
-              languageCode,
-              language: currentMeta.englishName,
-            }),
+          const transcript = await transcribeMedicalAudio({
+            audioBase64: base64Audio,
+            mimeType,
+            languageCode,
+            language: currentMeta.englishName,
           });
-
-          const data = await res.json().catch(() => null);
-          if (!res.ok || !data?.transcript) {
-            throw new Error(
-              data?.error || "We couldn't transcribe that audio clearly."
-            );
-          }
 
           setInputText((prev) => {
             const trimmed = prev.trim();
             return trimmed
-              ? `${trimmed}\n${data.transcript.trim()}`
-              : data.transcript.trim();
+              ? `${trimmed}\n${transcript.trim()}`
+              : transcript.trim();
           });
         } catch (err: any) {
           setErrorMessage(
-            err?.message ||
+            formatGeminiErrorMessage(
+              err,
+              t.errors,
               "We couldn't transcribe your voice recording clearly. Please try again."
+            )
           );
         } finally {
           setIsTranscribingAudio(false);
@@ -6528,13 +6445,11 @@ export default function App() {
                     >
                       <div className="flex items-center gap-2 pl-1">
                         <span className="font-serif text-sm font-medium text-[#1F4E4A] dark:text-[#8CE0C0]">
-                          {isChatWakingUp
-                            ? t.chat.wakingUpStatus
-                            : t.chat.thinkingStatus.replace(
-                                "{specialty}",
-                                t.chat.specialists[selectedSpecialty]?.label ||
-                                  selectedSpecialty
-                              )}
+                          {t.chat.thinkingStatus.replace(
+                            "{specialty}",
+                            t.chat.specialists[selectedSpecialty]?.label ||
+                              selectedSpecialty
+                          )}
                         </span>
                       </div>
                       <div className="rounded-[20px] px-5 py-4 bg-[#DCE8E2] dark:bg-[#1B332E] border border-[#1F4E4A]/12 dark:border-[#8CE0C0]/20 inline-flex items-center gap-2">
