@@ -1,22 +1,26 @@
-declare const process:
-  | {
-      env?: {
-        GEMINI_API_KEY?: string;
-        VITE_GEMINI_API_KEY?: string;
-      };
-    }
-  | undefined;
+declare const process: {
+  env?: {
+    GEMINI_API_KEY?: string;
+  };
+};
 
 export function getGeminiApiKey(): string {
   const viteKey =
     typeof import.meta !== "undefined" && import.meta.env
-      ? import.meta.env.VITE_GEMINI_API_KEY || ""
+      ? import.meta.env.VITE_GEMINI_API_KEY
       : "";
+  if (typeof viteKey === "string" && viteKey.trim()) {
+    return viteKey.trim();
+  }
 
-  const processKey =
-    typeof process !== "undefined" && process?.env
-      ? process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ""
-      : "";
+  try {
+    const processKey = process?.env?.GEMINI_API_KEY;
+    if (typeof processKey === "string" && processKey.trim()) {
+      return processKey.trim();
+    }
+  } catch {
+    // Ignore when process is not defined in browser without define replacement
+  }
 
-  return (viteKey || processKey || "").trim();
+  return "";
 }

@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { FIXED_SAFETY_MESSAGES } from "../i18n/safetyMessages";
 import type { TranslationDictionary } from "../i18n/types";
+import { getGeminiApiKey } from "../lib/apiKey";
 import {
   buildMultilingualAiBehaviorBlock,
   matchesEmergencyKeyword,
@@ -9,12 +10,6 @@ import {
   stripCodeFences,
   toWesternDigits,
 } from "./safetyRules";
-
-declare const process: {
-  env: {
-    GEMINI_API_KEY?: string;
-  };
-};
 
 export const PRIMARY_GEMINI_MODEL = "gemini-3.1-flash-lite";
 export const FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
@@ -28,21 +23,8 @@ export class MissingApiKeyError extends Error {
   }
 }
 
-function getApiKey(): string {
-  const viteKey =
-    typeof import.meta !== "undefined" && import.meta.env
-      ? import.meta.env.VITE_GEMINI_API_KEY
-      : undefined;
-  const definedKey =
-    typeof process !== "undefined" && process.env
-      ? process.env.GEMINI_API_KEY
-      : undefined;
-  const raw = viteKey || definedKey || "";
-  return typeof raw === "string" ? raw.trim() : "";
-}
-
 function createGeminiClient(): GoogleGenAI {
-  const apiKey = getApiKey();
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
     throw new MissingApiKeyError();
   }
